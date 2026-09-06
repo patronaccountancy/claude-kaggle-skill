@@ -17,6 +17,19 @@ against that.
 - **Invent** — five ranked sources of genuinely new ideas, batch-ranked by expected gain × confidence ÷ cost, killed cheaply, logged so nothing is rediscovered.
 - **Get better at getting better** — a stall ladder (change the level, not the parameters) and budget reallocation from the experiment log.
 
+## `/kaggle init`
+
+Joining a project where work already happened — a notebook, a folder of submissions, a long
+chat — before the skill was loaded? `/kaggle init` adopts it: inventories what exists,
+rebuilds the experiment ledger from the real submission history, re-runs the current best to
+check it reproduces, runs the leakage and fold-hygiene tests against the existing code,
+reconciles claimed CV against actual LB, then marks every inherited claim VERIFIED /
+UNVERIFIED / REFUTED. Only verified numbers become a baseline. It writes `STATE.md` and
+`experiments.md` so nothing is lost when the context window ends.
+
+Expect the honest score to come out **lower** than the one you had been reading. That drop is
+the point — it was never real, and the leaderboard was going to collect the difference anyway.
+
 ## Install
 
 As a plugin:
