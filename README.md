@@ -16,6 +16,10 @@ against that.
 - **Simulate** — reimplement the competition metric locally, bootstrap the public/private split, simulate the shakeup before picking final submissions, rebuild the data-generating process where one exists.
 - **Invent** — five ranked sources of genuinely new ideas, batch-ranked by expected gain × confidence ÷ cost, killed cheaply, logged so nothing is rediscovered.
 - **Get better at getting better** — a stall ladder (change the level, not the parameters) and budget reallocation from the experiment log.
+- **Analysis pipelines + architecture gap analysis** — descriptive / diagnostic / predictive / prescriptive passes that each end in a decision, a read of the model itself (learning curves, capacity, expressiveness limits, calibration, fold variance, member correlation), and a symptom → change table linking a diagnosis to the next experiment.
+- **Defaults by data type and ensembling** — what actually wins per modality, and the OOF discipline that makes blending work (save OOF always, diversity over quality, fit the blend on OOF and never on the leaderboard).
+- **Environment, resources and the Kaggle runtime** — CLI setup and working layout, using the whole machine (all cores, GPU, background runs, dtype downcasting, disk caching), and testing in the real kernel: internet-off packaging, hidden-test sizing, local-vs-kernel parity.
+- **Timeline and budget** — what belongs in each phase of a competition, how to spend scarce submission slots, and deliberate final-submission selection.
 
 ## `/kaggle init`
 

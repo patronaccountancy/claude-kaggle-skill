@@ -27,6 +27,10 @@ not just the first answer.
 `/kaggle` — work as this persona from here on.
 `/kaggle init` — first run the adoption protocol below, then continue as normal.
 
+Order of operations when starting fresh: **Environment and resources** → **Loop / DISCOVER**
+→ baseline submission → everything else. When a score and a rule disagree, the rule wins;
+**The one law** and **Validation rules** override any result that contradicts them.
+
 Run `init` **without being asked** whenever you are joining work already in progress:
 a competition folder, notebook, submission file or `STATE.md` already exists, or the
 conversation has been doing data-science work before this skill loaded. Adopting
@@ -250,6 +254,33 @@ the table names the architecture change, and the change becomes the next tracked
 Never change the architecture because a new model is fashionable — change it because a
 diagnosis pointed at it.
 
+## Defaults by data type
+
+Start here, then let diagnosis move you. Picking the wrong family for the modality is the
+one mistake that cannot be recovered by tuning.
+
+- **Tabular** — gradient boosting (LightGBM / XGBoost / CatBoost) is the default and usually the answer; CatBoost first when categoricals are many or high-cardinality. Add a linear or NN model only for ensemble diversity. Neural nets rarely win here alone.
+- **Text** — a fine-tuned transformer encoder (DeBERTa-v3 family and successors) beats TF-IDF, but TF-IDF + linear is a 10-minute baseline worth having for the ensemble. Max-length and pooling choices often matter more than model size.
+- **Images** — fine-tune a pretrained backbone; do not train from scratch. Augmentation, resolution and TTA typically move the score more than architecture. Progressive resizing saves GPU hours.
+- **Time series** — validate with a time split, always. Lag/rolling features into a GBDT beat most deep models on tabular-shaped series; check for a trend a tree cannot extrapolate, and decide between recursive and direct multi-step forecasting deliberately.
+- **Audio** — spectrogram + image backbone is the strong default; augment in the waveform *and* the spectrogram.
+- **Multi-modal / tabular + text or images** — extract embeddings from the heavy model, feed them to a GBDT alongside the tabular columns. Almost always beats end-to-end on small data.
+- **Small data (< ~10k rows)** — repeated k-fold, heavy regularisation, simple models, and ensembling by averaging seeds. Fold noise will dominate everything; raise the number of repeats before believing any delta.
+- **Reinforcement / simulation** — build a fast local ladder with held-out seeds and a self-duel control; local match volume is the whole game.
+
+## Ensembling
+
+The last reliable 1-2% and the cheapest thing most people leave on the table. It is also
+where CV lies most easily, so it gets its own rules.
+
+- **Save out-of-fold predictions for every model, always.** Without an OOF matrix you cannot blend, weight or stack, and re-running six models later to recover them is a wasted day. Save test predictions at the same time.
+- **Diversity beats quality.** Two models at 0.83 that disagree blend better than a 0.84 and a 0.835 that agree. Get diversity from different families, feature sets, losses, target transforms and folds — not from another seed of the same model.
+- **Check correlation before adding a member.** Above ~0.98 with the existing blend it will add nothing; below ~0.9 even a noticeably weaker model usually helps.
+- **Escalate only as needed:** simple average → rank average (use it whenever the metric is rank-based, and whenever members are on different scales) → weight search on OOF → hill-climbing with replacement → a stacked meta-model. Hill-climbing on OOF is the best value for effort; stacking wins less often than people expect and overfits more.
+- **Fit the blend on OOF, never on the leaderboard.** Weights tuned against public LB feedback are fitted to a few thousand rows of noise and are the classic private-LB collapse.
+- **The meta-model must respect the same folds.** Nested or fold-consistent, or the stack is trained on predictions that saw their own validation rows.
+- **Seed-averaging is the free one.** Same model, several seeds, averaged: costs only compute, reduces variance, and never hurts.
+
 ## Validation rules (these are why people lose)
 
 1. **Match CV to the test split.** Time-ordered test -> TimeSeriesSplit. Groups (user/store/patient) -> GroupKFold. Anything else quietly leaks and inflates CV.
@@ -337,7 +368,7 @@ ensembling & blending weights
 features (from error slices, not from a list)
 validation scheme                            <- if CV and LB disagree, this IS the bug
 data (external sources, pseudo-labels, augmentation, more rows)
-model family / architecture                  <- expensive, usually smallest gain
+model family / architecture                  <- expensive; small gain if the family was right to begin with
 reframe the problem                          <- classification vs regression, different target, different unit of prediction
 ```
 
@@ -380,13 +411,31 @@ external data, and whether inference re-runs against a hidden test set much larg
 - **GPU quota is a budget.** Do not spend a week's hours on a tuning run that a cheap CPU experiment could have rejected first.
 - **Submit only after one clean end-to-end kernel run.** Never from a notebook whose last cell you edited and did not rerun.
 
+## Timeline and budget
+
+Different weeks call for different work. Losing to the clock is as common as losing to a
+better model.
+
+- **Day one:** environment, a working end-to-end pipeline, a submission on the board. Nothing else.
+- **Early:** validation you trust, EDA, external data, the cheap high-value features. This is when a broken CV is cheap to fix; later it is catastrophic.
+- **Middle:** the experiment loop. Features and diagnosis, not architecture shopping.
+- **Late:** ensembling, seed-averaging, pseudo-labelling, post-processing and calibration. Freeze the feature set; stop adding surface area.
+- **Final days:** no new ideas. Retrain the chosen models on all data if the setup allows, verify the kernel runs clean end to end, and select the final submissions. Anything begun in the last 48 hours will not be validated in time.
+
+**Submission slots are a scarce resource** (usually 5/day). Spend them on: the day-one
+baseline, anything that changes the CV/LB relationship, a genuine best-CV candidate, and
+probing a specific uncertainty. Do not spend them on small variations of what you already
+submitted — that is guessing, and each one buys you a data point of pure LB noise.
+
+**Never leave the final-submission selection to the deadline.** Choose deliberately: one
+safest by CV/LB agreement, one higher-variance if the standing justifies it. Say which is
+which, and why.
+
 ## Submitting
 
 ```bash
-kaggle competitions download -c <slug> -p data/
 kaggle competitions submit -c <slug> -f submission.csv -m "EXP-017 oof target enc, cv 0.8241"
 kaggle competitions submissions -c <slug>          # LB result
-kaggle kernels push -p kernel/                     # kernel-only comps
 ```
 
 Always put the experiment ID in the submission message — that is the join key between
