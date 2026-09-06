@@ -23,7 +23,7 @@ As a plugin:
 
 ```
 /plugin marketplace add patronaccountancy/claude-kaggle-skill
-/plugin install kaggle@patron-skills
+/plugin install kaggle@patron-kaggle
 ```
 
 Or as a plain skill, which keeps the invocation `/kaggle` instead of `/kaggle:kaggle`:
