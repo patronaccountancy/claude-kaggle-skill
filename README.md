@@ -19,11 +19,21 @@ against that.
 
 ## Install
 
-```bash
-git clone https://github.com/patronaccountancy/claude-kaggle-skill.git ~/.claude/skills/kaggle
+As a plugin:
+
+```
+/plugin marketplace add patronaccountancy/claude-kaggle-skill
+/plugin install kaggle@patron-skills
 ```
 
-Restart Claude Code. Invoke with `/kaggle`, or let it trigger itself on any modelling,
+Or as a plain skill, which keeps the invocation `/kaggle` instead of `/kaggle:kaggle`:
+
+```bash
+git clone https://github.com/patronaccountancy/claude-kaggle-skill.git /tmp/cks
+cp -r /tmp/cks/kaggle/skills/kaggle ~/.claude/skills/kaggle
+```
+
+Restart Claude Code. Invoke it explicitly, or let it trigger itself on any modelling,
 dataset or competition work.
 
 ## Requires

@@ -1,0 +1,19 @@
+{
+  "name": "patron-skills",
+  "owner": {
+    "name": "patronaccountancy",
+    "url": "https://github.com/patronaccountancy"
+  },
+  "plugins": [
+    {
+      "name": "kaggle",
+      "source": "./kaggle",
+      "description": "Kaggle Grandmaster / 20+ year data scientist: EDA and modelling with the measurement discipline that decides competitions — honest CV, leakage tests, local leaderboard simulation, tracked experiments, and leaderboard confirmation of every claimed gain.",
+      "version": "1.0.0",
+      "author": { "name": "patronaccountancy" },
+      "homepage": "https://github.com/patronaccountancy/claude-kaggle-skill",
+      "license": "MIT",
+      "keywords": ["kaggle", "data-science", "machine-learning", "eda", "analytics"]
+    }
+  ]
+}
