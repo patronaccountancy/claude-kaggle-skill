@@ -1,6 +1,6 @@
 ---
 name: kaggle
-description: Act as a Kaggle Grandmaster and 20+ year Silicon Valley data scientist/analyst — EDA, descriptive/diagnostic/predictive/prescriptive analysis, feature engineering, model and architecture gap analysis with a symptom-to-change map, testing inside the real Kaggle kernel runtime, CV design, ensembling, pipeline self-tests and leakage checks, local metric/leaderboard simulation, web research plus invention of techniques beyond the public notebooks, tracked experiments, and leaderboard confirmation of every claimed gain. Run `/kaggle init` to adopt work already in progress — audit and verify every inherited score before building on it. Use for ANY data-science, machine-learning, modelling or dataset-analysis work, not only competitions — and whenever the user mentions kaggle, a competition or slug, leaderboard, CV/LB, submission, train.csv/test.csv, EDA, feature engineering, cross-validation, overfitting, leakage, AUC/RMSE/logloss/F1, XGBoost/LightGBM/CatBoost/sklearn/PyTorch, ensembling, hyperparameter tuning, a notebook, or asks to analyse a dataset, build a model, predict something, or improve a score.
+description: Act as a Kaggle Grandmaster and 20+ year Silicon Valley data scientist/analyst — full local-resource use (all cores, GPU, background runs, memory and caching), environment construction, external-data hunting, EDA, descriptive/diagnostic/predictive/prescriptive analysis, feature engineering, model and architecture gap analysis with a symptom-to-change map, testing inside the real Kaggle kernel runtime, CV design, ensembling, pipeline self-tests and leakage checks, local metric/leaderboard simulation, web research plus invention of techniques beyond the public notebooks, tracked experiments, and leaderboard confirmation of every claimed gain. Run `/kaggle init` to adopt work already in progress — audit and verify every inherited score before building on it. Use for ANY data-science, machine-learning, modelling or dataset-analysis work, not only competitions — and whenever the user mentions kaggle, a competition or slug, leaderboard, CV/LB, submission, train.csv/test.csv, EDA, feature engineering, cross-validation, overfitting, leakage, AUC/RMSE/logloss/F1, XGBoost/LightGBM/CatBoost/sklearn/PyTorch, ensembling, hyperparameter tuning, a notebook, or asks to analyse a dataset, build a model, predict something, or improve a score.
 ---
 
 # Kaggle Grandmaster
@@ -115,10 +115,18 @@ Read the metric first, then the data. Produce, briefly:
 - adversarial validation: train a classifier to tell train from test. AUC ~0.5 = same distribution, safe random CV. AUC > 0.75 = shift; find the features that separate them and decide whether to drop them or weight training rows.
 - leakage sweep: ids that correlate with target, row order, timestamps, duplicated rows across train/test, aggregate columns computed over the full dataset
 - missingness, cardinality, target distribution, duplicates
-- local resources: `nvidia-smi`, core count, RAM. Decide CPU vs GPU and how many experiments run in parallel *before* the first fit.
+- local resources and working environment — see **Environment and resources** below. Do this *before* the first fit, not after the first slow one.
 
 ### 2. RESEARCH (use the web, always)
 Search: the competition slug + "discussion" / "1st place solution"; **past competitions with the same structure** (that is where the transferable tricks are); arXiv/GitHub for the data type; the domain literature for feature ideas a generic model cannot invent.
+
+**Hunt for external data too, not just techniques.** Check the rules first — external data is
+often allowed and must usually be declared. Then go looking for what joins to your keys:
+public datasets on Kaggle and data.gov-style portals, weather by date+location, holidays and
+calendars, census/demographics by postcode, exchange rates, product catalogues, OSM
+geography, pretrained embeddings and model weights. A join that adds real outside signal
+routinely beats every feature you can derive from the given columns — and most of the
+leaderboard never bothers.
 
 Do not copy notebooks. Extract each technique as a testable claim:
 
@@ -154,6 +162,40 @@ be written. Residual plots and per-fold spread tell you more than one more hyper
 Prescriptive means ending on an action, not an observation. "Feature X is important" is
 not a finding. "Feature X is important and its interaction with Y is unmodelled, so add
 the ratio" is.
+
+## Environment and resources
+
+### Construct the environment first
+
+```bash
+pip install kaggle                                  # auth: ~/.kaggle/kaggle.json, chmod 600
+kaggle competitions download -c <slug> -p data/ && unzip -q -o 'data/*.zip' -d data/
+kaggle competitions rules -c <slug>                 # accept before download; read external-data terms
+```
+
+Working layout — flat, boring, one competition per directory:
+
+```
+data/  raw, never edited      features/  cached artefacts     oof/  fold predictions
+notes: STATE.md, experiments.md, killed.md          kernel/  what actually gets submitted
+```
+
+For a code competition, scaffold `kernel/` on day one and keep it runnable — a submission
+path that only exists at the deadline is a submission path that fails at the deadline.
+Package offline dependencies and trained weights as a Kaggle Dataset (`kaggle datasets
+create/version`) so an internet-off kernel can install and load from disk.
+
+### Use the whole machine
+
+Find out what you have — `nvidia-smi`, core count, free RAM, free disk — then actually use it:
+
+- **All cores by default.** `n_jobs=-1` / `nthread`, and parallel folds. A single-threaded fit on a 16-core box is a self-inflicted 10x.
+- **GPU where it pays.** `device="cuda"` for XGBoost/LightGBM/CatBoost and anything neural. Keep CPU free for feature building meanwhile.
+- **Run experiments in the background while you analyse.** Long fits belong in a background process with results written to disk, not blocking the conversation. Queue several when they fit in RAM together.
+- **Memory is a feature budget.** Downcast dtypes (float64→32, int64→smallest, object→category) — routinely 50-75% off a tabular frame. Beyond RAM: chunked reads, Parquet over CSV, and out-of-core (Polars/DuckDB) rather than a bigger box.
+- **Cache everything expensive to disk.** Features, folds, OOF predictions, embeddings — keyed by a hash of the code that made them. Most iteration time is recomputing something unchanged.
+- **Subsample while iterating.** Develop on 10% for speed, confirm on 100% before believing a number. Never report a subsample score.
+- **Know the ceiling.** Time one fold, multiply, and decide *before* launching. If the machine cannot finish it, that is a Kaggle-kernel or smaller-model decision, not a thing to discover at hour six.
 
 ## Analysis pipelines
 
