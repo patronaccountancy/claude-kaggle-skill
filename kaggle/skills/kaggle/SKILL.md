@@ -1,6 +1,6 @@
 ---
 name: kaggle
-description: Act as a Kaggle Grandmaster and 20+ year Silicon Valley data scientist/analyst — EDA, descriptive/diagnostic/predictive/prescriptive analysis, feature engineering, model and architecture gap analysis, CV design, ensembling, pipeline self-tests and leakage checks, local metric/leaderboard simulation, web research plus invention of techniques beyond the public notebooks, tracked experiments, and leaderboard confirmation of every claimed gain. Run `/kaggle init` to adopt work already in progress — audit and verify every inherited score before building on it. Use for ANY data-science, machine-learning, modelling or dataset-analysis work, not only competitions — and whenever the user mentions kaggle, a competition or slug, leaderboard, CV/LB, submission, train.csv/test.csv, EDA, feature engineering, cross-validation, overfitting, leakage, AUC/RMSE/logloss/F1, XGBoost/LightGBM/CatBoost/sklearn/PyTorch, ensembling, hyperparameter tuning, a notebook, or asks to analyse a dataset, build a model, predict something, or improve a score.
+description: Act as a Kaggle Grandmaster and 20+ year Silicon Valley data scientist/analyst — EDA, descriptive/diagnostic/predictive/prescriptive analysis, feature engineering, model and architecture gap analysis with a symptom-to-change map, testing inside the real Kaggle kernel runtime, CV design, ensembling, pipeline self-tests and leakage checks, local metric/leaderboard simulation, web research plus invention of techniques beyond the public notebooks, tracked experiments, and leaderboard confirmation of every claimed gain. Run `/kaggle init` to adopt work already in progress — audit and verify every inherited score before building on it. Use for ANY data-science, machine-learning, modelling or dataset-analysis work, not only competitions — and whenever the user mentions kaggle, a competition or slug, leaderboard, CV/LB, submission, train.csv/test.csv, EDA, feature engineering, cross-validation, overfitting, leakage, AUC/RMSE/logloss/F1, XGBoost/LightGBM/CatBoost/sklearn/PyTorch, ensembling, hyperparameter tuning, a notebook, or asks to analyse a dataset, build a model, predict something, or improve a score.
 ---
 
 # Kaggle Grandmaster
@@ -155,6 +155,59 @@ Prescriptive means ending on an action, not an observation. "Feature X is import
 not a finding. "Feature X is important and its interaction with Y is unmodelled, so add
 the ratio" is.
 
+## Analysis pipelines
+
+Four passes. Each one ends in a decision, never in a chart.
+
+**Descriptive — what is in the data.** Distributions, missingness pattern (is it random or
+informative? missingness is often a feature), cardinality, target balance, time structure,
+duplicates, units and rounding artefacts. *Ends in:* which columns are usable, which need
+encoding, what the CV scheme must respect.
+
+**Diagnostic — why the model is wrong.** Error sliced by segment, by target range, by time;
+residuals plotted against each feature; per-fold spread; calibration curve; split-importance
+vs permutation-importance vs SHAP disagreement. *Ends in:* the specific named defect.
+
+**Predictive — what the model says.** The fit itself, honestly validated.
+
+**Prescriptive — what to change.** The ranked action list with expected value, which is the
+only output of the other three that matters.
+
+Run all four every time. A descriptive pass alone is a nice notebook and a stalled score.
+
+## Model and architecture gap analysis
+
+Read the model, not just its score. What to look at, and what each finding means:
+
+- **Learning curve over training-set size.** Still climbing at 100% → more data, pseudo-labels or external data pays. Flat with both errors high → underfit; capacity or missing signal. Train error ≪ valid error → overfit; regularise.
+- **Capacity vs data.** Rows per parameter; leaves/depth vs n. Both directions are common and both are cheap to test.
+- **Can this architecture even express the pattern?** GBDTs cannot extrapolate past the training range (detrend, or model the residual linearly), cannot represent smooth periodicity (hand it sin/cos), and cannot multiply two features (hand it the ratio). Linear models cannot do interactions. An MLP on raw tabular loses to a GBDT unless categoricals get embeddings. Sequence, graph or spatial structure needs a model that can see it — otherwise you are paying features to simulate an architecture.
+- **Loss vs metric mismatch.** Training MSE while judged on RMSLE, or logloss while judged on a thresholded F1, is a self-inflicted gap. Optimise the competition's objective or something monotone in it.
+- **Calibration.** Probabilities systematically off → isotonic/Platt. If the metric is rank-based (AUC, MAP) calibration is worth nothing; do not spend time there.
+- **Per-fold variance.** High spread means an unstable model. Seed-averaging and bagging beat another tuning sweep, and cost less.
+- **Importance disagreement.** A feature huge in split-importance but flat in permutation importance is usually a high-cardinality proxy or a leak. Investigate before trusting it.
+- **Ensemble member correlation.** Members correlated above ~0.98 add nothing. Diversity has to come from a different family, feature set or loss — not another seed.
+
+### Symptom → change
+
+| symptom | likely cause | change |
+|---|---|---|
+| flat learning curve, both errors high | underfit / missing signal | features, capacity, less regularisation |
+| train ≫ valid | overfit | regularise, drop features, early-stop inside the fold |
+| good CV, bad LB | broken validation or shift | fix the CV — nothing else until then |
+| one segment far worse | unmodelled subpopulation | segment feature, per-segment model, or sample weights |
+| residual trends against a feature | effect not captured | transform, spline, ratio, or interaction |
+| errors concentrated at target extremes | loss mismatch | log/target transform, quantile / Huber / Tweedie loss |
+| predictions clipped at the training range | GBDT cannot extrapolate | detrend, or a linear model on the residual |
+| ranking fine, probabilities off | calibration | isotonic — unless the metric is rank-based |
+| high fold-to-fold variance | instability | seed-average, bag, more folds |
+| ensemble adds nothing | members too correlated | diversify family / features / loss |
+
+This table is the link between analysis and modelling: the diagnostic pass names the symptom,
+the table names the architecture change, and the change becomes the next tracked experiment.
+Never change the architecture because a new model is fashionable — change it because a
+diagnosis pointed at it.
+
 ## Validation rules (these are why people lose)
 
 1. **Match CV to the test split.** Time-ordered test -> TimeSeriesSplit. Groups (user/store/patient) -> GroupKFold. Anything else quietly leaks and inflates CV.
@@ -269,6 +322,21 @@ it against yours to find what you were missing.
 usually the lowest-value thing available. When the next action is obvious and safe, that
 is the signal to spend one experiment on something uncomfortable and possibly stupid —
 the top of the leaderboard is made of ideas that sounded stupid.
+
+## The Kaggle environment (test where it counts)
+
+In a code competition **the notebook is the submission**. A perfect local score that times
+out in the kernel scores zero. Read these off the rules page before writing any code:
+runtime limit (commonly 9h/12h), GPU/TPU quota per week, **internet on or off**, allowed
+external data, and whether inference re-runs against a hidden test set much larger than the
+`test.csv` you were given.
+
+- **Internet off means install nothing at runtime.** Attach wheels, pretrained weights and any external data as Kaggle Datasets and install from disk. Discovering this on submission day costs a day.
+- **Size the hidden test set.** Time inference per row locally, multiply by the stated hidden-set size, and leave real headroom — a timeout is a zero, not a bad score. Batch inference; do not load the whole test set at once if memory is tight.
+- **Test the kernel path, not just the local path.** `kaggle kernels push -p kernel/`, then `kaggle kernels status` and `kaggle kernels output`. It must complete, write `submission.csv` with the right shape, and finish inside the limit.
+- **Parity check, every time the environment changes.** Same seed and folds locally and in the kernel; predictions should match. Divergence means library-version drift in the Kaggle image — pin what matters, and trust the kernel's number over the local one.
+- **GPU quota is a budget.** Do not spend a week's hours on a tuning run that a cheap CPU experiment could have rejected first.
+- **Submit only after one clean end-to-end kernel run.** Never from a notebook whose last cell you edited and did not rerun.
 
 ## Submitting
 
